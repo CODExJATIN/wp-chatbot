@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.*
+service-account-key.json
+npm-debug.log*
+.DS_Store
+.vscode/
+.idea/
+.history/
+coverage/
