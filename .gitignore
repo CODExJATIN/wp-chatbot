@@ -12,4 +12,6 @@ coverage/
 
 # WhatsApp-web.js auth/cache
 .wwebjs_auth/
+.cache/
+.wwebjs_cache/
 cache/
