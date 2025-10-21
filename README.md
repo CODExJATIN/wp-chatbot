@@ -1,5 +1,7 @@
 # wp-chatbot
 
+<img src="https://cdn.simpleicons.org/whatsapp/ffffff?size=96&bg=25D366" alt="WhatsApp logo" width="96" />
+
 Lightweight WhatsApp auto-responder that uses WhatsApp Web, Vertex AI (Gemini) and an Express control API.
 
 Important: This repository may reference a Google service account key. Do NOT commit secrets to GitHub. See the Security section below.
