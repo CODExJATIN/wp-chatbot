@@ -131,7 +131,7 @@ client.initialize();
 const app = express();
 app.use(express.json());
 
-app.post("/toggle", (req, res) => {
+app.get("/toggle", (req, res) => {
   isOnline = !isOnline;
   console.log(`🔁 Bot status: ${isOnline ? "🟢 Online" : "🔴 Offline"}`);
   res.json({ status: isOnline ? "🟢 Online" : "🔴 Offline" });
