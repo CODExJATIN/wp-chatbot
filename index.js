@@ -1,19 +1,20 @@
 const express = require("express");
-const qrcode = require("qrcode"); // <-- 1. MODIFICATION: Import the new package
+const qrcode = require("qrcode");
 const { Client, LocalAuth } = require("whatsapp-web.js");
+const puppeteer = require("puppeteer-core");
 const axios = require("axios");
 const { GoogleAuth } = require("google-auth-library");
 require("dotenv").config();
 
 let isOnline = false;
-let qrCodeData = null; // <-- 2. MODIFICATION: Variable to store the QR code
+let qrCodeData = null;
 
 const auth = new GoogleAuth({
   keyFilename: "./service-account-key.json",
   scopes: "https://www.googleapis.com/auth/generative-language",
 });
 
-// --- Gemini API Function (No changes needed here, but corrected a potential typo in the model name) ---
+// --- Gemini API Function ---
 async function chatWithGemini(messages) {
   try {
     const accessToken = await auth.getAccessToken();
@@ -34,12 +35,15 @@ If the user's question is personal, urgent, or about anything not covered in you
 
     const finalPrompt = `${systemPrompt}\n\nConversation:\n${chatHistory}\n\nReply:`;
 
-    // Note: 'gemini-2.5-flash-lite' is not a standard model name. 
-    // Corrected to 'gemini-1.5-flash-latest' which is more common. Adjust if you have a specific model.
     const response = await axios.post(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
       {
-        contents: [{ parts: [{ text: finalPrompt }] }],
+        input: [
+          {
+            role: "user",
+            content: [{ type: "text", text: finalPrompt }],
+          },
+        ],
       },
       {
         headers: {
@@ -50,7 +54,7 @@ If the user's question is personal, urgent, or about anything not covered in you
     );
 
     return (
-      response.data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      response.data?.candidates?.[0]?.content?.[0]?.text ||
       "Sorry, I couldn’t think of a reply just now!"
     );
   } catch (err) {
@@ -62,17 +66,30 @@ If the user's question is personal, urgent, or about anything not covered in you
 // --- WhatsApp Client ---
 const client = new Client({
   authStrategy: new LocalAuth(),
+  puppeteer: {
+    executablePath: process.env.CHROME_PATH || "/usr/bin/google-chrome-stable",
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--no-first-run",
+      "--no-zygote",
+      "--single-process",
+      "--disable-gpu",
+    ],
+  },
 });
 
-// --- 3. MODIFICATION: Update the 'qr' event listener ---
 client.on("qr", (qr) => {
-  console.log("📱 QR code received! Scan it by visiting the /qr endpoint in your browser.");
-  qrCodeData = qr; // Store the QR code data
+  console.log("📱 QR code received! Visit /qr to scan.");
+  qrCodeData = qr;
 });
 
 client.on("ready", () => {
-  console.log("✅ WhatsApp bot connected and ready!");
-  qrCodeData = null; // Clear QR data once logged in
+  console.log("✅ WhatsApp bot connected!");
+  qrCodeData = null;
 });
 
 const activeSessions = {};
@@ -90,7 +107,6 @@ client.on("message", async (msg) => {
         const introMsg = `Hi! Jatin is currently offline. I'm his chat assistant 🤖. I can help answer some general questions or note your message so Jatin can reply later.`;
         await msg.reply(introMsg);
         activeSessions[chatId] = true;
-        console.log("📤 Sent fixed intro message");
         return;
       }
 
@@ -98,9 +114,6 @@ client.on("message", async (msg) => {
       const messages = await chat.fetchMessages({ limit: 5 });
       const aiReply = await chatWithGemini(messages);
       await msg.reply(aiReply);
-      console.log("📤 Gemini reply sent:", aiReply);
-    } else {
-      console.log("🧠 You’re online — bot not replying.");
     }
   } catch (error) {
     console.error("❌ Error handling message:", error);
@@ -113,24 +126,21 @@ client.initialize();
 const app = express();
 app.use(express.json());
 
-// --- 4. MODIFICATION: Add a new endpoint to display the QR code ---
-app.get("/qr", (req, res) => {
+app.get("/qr", async (req, res) => {
   if (qrCodeData) {
-    qrcode.toDataURL(qrCodeData, (err, url) => {
-      if (err) {
-        res.status(500).send("Error generating QR code.");
-      } else {
-        res.send(`<img src="${url}" alt="WhatsApp QR Code">`);
-      }
-    });
+    try {
+      const url = await qrcode.toDataURL(qrCodeData);
+      res.send(`<img src="${url}" alt="WhatsApp QR Code">`);
+    } catch (err) {
+      res.status(500).send("Error generating QR code.");
+    }
   } else {
-    res.send("✅ Bot is ready or QR code is not available yet. Please refresh.");
+    res.send("✅ Bot is ready or QR code not available yet. Refresh the page.");
   }
 });
 
 app.get("/toggle", (req, res) => {
   isOnline = !isOnline;
-  console.log(`🔁 Bot status: ${isOnline ? "🟢 Online" : "🔴 Offline"}`);
   res.json({ status: isOnline ? "🟢 Online" : "🔴 Offline" });
 });
 
@@ -138,5 +148,5 @@ app.get("/status", (req, res) => {
   res.json({ status: isOnline ? "🟢 Online" : "🔴 Offline" });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🌐 API running at http://localhost:${PORT}`));
