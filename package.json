@@ -29,6 +29,7 @@
     "google-auth-library": "^9.11.0",
     "nodemon": "^3.1.4",
     "qrcode": "^1.5.3",
-    "whatsapp-web.js": "^1.23.0"
+    "whatsapp-web.js": "^1.23.0",
+    "puppeteer-core": "^21.3.1"
   }
 }
